@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1a1a2e">
+  <title>My Tools</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    /* ── Design tokens (8pt grid, follows webDesignLanguage rules) ── */
+    :root {
+      --space-1: 4px;  --space-2: 8px;  --space-3: 12px;
+      --space-4: 16px; --space-5: 24px; --space-6: 32px; --space-8: 48px;
+
+      --bg:               #1a1a2e;
+      --surface:          #16213e;
+      --surface2:         #0f3460;
+      --surface-hover:    rgba(255,255,255,0.04);
+      --surface-pressed:  rgba(255,255,255,0.08);
+
+      --text:             #f0f0f0;
+      --text-dim:         #a0a0b0;
+      --text-disabled:    rgba(255,255,255,0.3);
+
+      --accent:           #e94560;
+      --accent-hover:     #d13a52;
+      --accent-subtle:    rgba(233,69,96,0.12);
+      --positive:         #00b894;
+      --positive-bg:      rgba(0,184,148,0.12);
+      --negative:         #e17055;
+      --negative-bg:      rgba(225,112,85,0.12);
+      --electric:         #4fc3f7;
+      --electric-bg:      rgba(79,195,247,0.10);
+
+      --border:           rgba(255,255,255,0.08);
+      --border-strong:    rgba(255,255,255,0.15);
+      --radius:           14px;
+      --radius-sm:        8px;
+      --radius-pill:      100px;
+    }
+
+    [data-theme="light"] {
+      --bg:               #f0f2f5;
+      --surface:          #ffffff;
+      --surface2:         #e4e6eb;
+      --surface-hover:    rgba(0,0,0,0.03);
+      --surface-pressed:  rgba(0,0,0,0.06);
+      --text:             #1c1e21;
+      --text-dim:         #65676b;
+      --text-disabled:    rgba(0,0,0,0.25);
+      --border:           rgba(0,0,0,0.10);
+      --border-strong:    rgba(0,0,0,0.20);
+      --positive-bg:      rgba(0,184,148,0.10);
+      --negative-bg:      rgba(225,112,85,0.10);
+      --electric-bg:      rgba(79,195,247,0.08);
+    }
+
+    /* ── Reset ── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* ── Base ── */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      font-size: 15px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Header ── */
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 var(--space-4);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      height: 48px;
+    }
+    .app-header h1 { font-size: 16px; font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .header-btn {
+      background: none; border: none;
+      color: var(--text-dim); cursor: pointer;
+      padding: var(--space-2); border-radius: var(--radius-sm);
+      font-size: 18px; display: flex; align-items: center;
+      transition: color 0.15s; flex-shrink: 0;
+    }
+    .header-btn:hover { color: var(--text); }
+    .back-btn { font-size: 22px; margin-left: -6px; line-height: 1; }
+
+    /* ── Views ── */
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* ══════════════════════════════════════════════════════
+       HOME VIEW
+    ══════════════════════════════════════════════════════ */
+    #view-home .greeting {
+      padding: var(--space-6) var(--space-4) var(--space-4);
+    }
+    #view-home .greeting-time { font-size: 12px; color: var(--text-dim); margin-bottom: var(--space-1); }
+    #view-home .greeting-name { font-size: 24px; font-weight: 700; }
+    #view-home .tools-grid {
+      padding: 0 var(--space-4) var(--space-8);
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
+      gap: var(--space-3);
+    }
+    .tool-card {
+      appearance: none; -webkit-appearance: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: var(--space-4);
+      cursor: pointer;
+      transition: background 0.15s, transform 0.12s, box-shadow 0.15s;
+      text-align: left;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+    }
+    .tool-card:hover  { background: var(--surface2); box-shadow: 0 2px 12px rgba(0,0,0,0.2); }
+    .tool-card:active { transform: scale(0.97); background: var(--surface-pressed); }
+    .tool-icon  { font-size: 30px; line-height: 1; margin-bottom: var(--space-2); display: block; }
+    .tool-name  { font-size: 14px; font-weight: 600; }
+    .tool-desc  { font-size: 11px; color: var(--text-dim); line-height: 1.4; }
+
+    /* ══════════════════════════════════════════════════════
+       SHARED TOOL LAYOUT
+    ══════════════════════════════════════════════════════ */
+    .tool-content {
+      padding: var(--space-4);
+      max-width: 540px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      padding-bottom: var(--space-8);
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: var(--space-4);
+    }
+    .card-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--text-dim);
+      margin-bottom: var(--space-3);
+    }
+
+    /* ══════════════════════════════════════════════════════
+       PHEV — RESULT HERO
+    ══════════════════════════════════════════════════════ */
+    .result-hero {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: var(--space-5) var(--space-4);
+      text-align: center;
+    }
+    .breakeven-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+      margin-bottom: var(--space-2);
+    }
+    .breakeven-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: var(--space-2);
+      line-height: 1;
+    }
+    .breakeven-value {
+      font-size: 60px;
+      font-weight: 800;
+      letter-spacing: -3px;
+      font-variant-numeric: tabular-nums;
+    }
+    .breakeven-unit { font-size: 16px; color: var(--text-dim); font-weight: 400; }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: var(--space-3);
+      padding: var(--space-1) var(--space-3);
+      border-radius: var(--radius-pill);
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .status-badge.positive { background: var(--positive-bg); color: var(--positive); }
+    .status-badge.negative { background: var(--negative-bg); color: var(--negative); }
+
+    /* ── Cost comparison bars ── */
+    .cost-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-2);
+    }
+    .cost-row:last-child { margin-bottom: 0; }
+    .cost-mode { font-size: 11px; color: var(--text-dim); width: 48px; flex-shrink: 0; }
+    .cost-bar-track {
+      flex: 1;
+      height: 8px;
+      background: var(--surface-pressed);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .cost-bar {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.4s cubic-bezier(0.4,0,0.2,1);
+      min-width: 4px;
+    }
+    .cost-bar.fuel { background: var(--negative); }
+    .cost-bar.elec { background: var(--positive); }
+    .cost-amount {
+      font-size: 13px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      width: 64px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* ── Monthly savings ── */
+    .savings-big {
+      font-size: 36px;
+      font-weight: 800;
+      color: var(--positive);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -1px;
+    }
+    .savings-label { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+    .month-costs {
+      display: flex;
+      justify-content: space-between;
+      margin-top: var(--space-3);
+    }
+    .month-cost-item { text-align: center; }
+    .month-cost-value {
+      font-size: 16px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+    .month-cost-label { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
+
+    /* ── Inputs ── */
+    .input-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-3);
+    }
+    .input-row:last-of-type { margin-bottom: 0; }
+    .input-label { font-size: 13px; color: var(--text-dim); flex: 1; min-width: 0; }
+    .input-wrap { display: flex; align-items: center; gap: var(--space-1); flex-shrink: 0; }
+    input[type="number"] {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 600;
+      padding: 5px var(--space-2);
+      width: 76px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      outline: none;
+      -moz-appearance: textfield;
+    }
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+    input[type="number"]:focus {
+      border-color: var(--border-strong);
+      box-shadow: 0 0 0 2px var(--accent-subtle);
+    }
+    .input-unit { font-size: 11px; color: var(--text-dim); white-space: nowrap; min-width: 60px; }
+
+    /* ── Range slider ── */
+    .range-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-top: var(--space-3);
+    }
+    .range-key { font-size: 12px; color: var(--text-dim); width: 76px; flex-shrink: 0; }
+    input[type="range"] {
+      -webkit-appearance: none; appearance: none;
+      flex: 1;
+      height: 4px;
+      background: var(--surface2);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    input[type="range"]::-webkit-slider-thumb:active {
+      transform: scale(1.15);
+      box-shadow: 0 0 0 4px var(--accent-subtle);
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      border: none;
+    }
+    .range-val { font-size: 13px; font-weight: 600; width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-1);
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      transition: background 0.15s, opacity 0.15s;
+      white-space: nowrap;
+      text-decoration: none;
+    }
+    .btn:hover { background: var(--surface-hover); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* ── Source indicator ── */
+    .source-text { font-size: 11px; margin-top: var(--space-2); line-height: 1.4; }
+    .source-live    { color: var(--positive); }
+    .source-cached  { color: var(--text-dim); }
+    .source-error   { color: var(--negative); }
+    .source-manual  { color: var(--text-dim); }
+
+    /* ── Preset chips ── */
+    .preset-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+    .preset-chip {
+      padding: var(--space-1) var(--space-2);
+      border-radius: var(--radius-pill);
+      font-size: 11px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      color: var(--text-dim);
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .preset-chip:hover { border-color: var(--accent); color: var(--text); }
+
+    /* ── Hint text ── */
+    .hint { font-size: 11px; color: var(--text-dim); line-height: 1.4; margin-top: var(--space-2); }
+
+    /* ── Divider ── */
+    .divider { height: 1px; background: var(--border); margin: var(--space-3) 0; }
+
+    /* ── Import area ── */
+    .import-area {
+      border: 1px dashed var(--border-strong);
+      border-radius: var(--radius-sm);
+      padding: var(--space-3) var(--space-4);
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      margin-top: var(--space-3);
+    }
+    .import-area:hover { border-color: var(--accent); background: var(--accent-subtle); }
+    .import-area.drag-over { border-color: var(--accent); background: var(--accent-subtle); }
+    .import-text { font-size: 12px; color: var(--text-dim); line-height: 1.6; }
+    .import-text strong { color: var(--text); }
+
+    /* ── CSV stats grid ── */
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+    .stat-value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
+    .stat-value.positive { color: var(--positive); }
+    .stat-key { font-size: 10px; color: var(--text-dim); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+    /* ── Efficiency note (shown after CSV import) ── */
+    .eff-note { font-size: 11px; color: var(--electric); margin-top: var(--space-2); }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════
+     HOME VIEW
+══════════════════════════════════════════════════════ -->
+<div id="view-home" class="view active">
+  <header class="app-header">
+    <h1>My Tools</h1>
+    <button class="header-btn" id="theme-btn" title="Toggle theme" aria-label="Toggle dark/light theme">◑</button>
+  </header>
+
+  <div class="greeting">
+    <div class="greeting-time" id="greeting-time"></div>
+    <div class="greeting-name">👋 Hi Abhineet</div>
+  </div>
+
+  <div class="tools-grid">
+    <button class="tool-card" data-view="phev">
+      <span class="tool-icon">⚡</span>
+      <span class="tool-name">PHEV Calculator</span>
+      <span class="tool-desc">Fuel vs electric cost — Volvo XC60 T6</span>
+    </button>
+    <!-- Future tools appear here -->
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     PHEV VIEW
+══════════════════════════════════════════════════════ -->
+<div id="view-phev" class="view">
+  <header class="app-header">
+    <button class="header-btn back-btn" data-view="home" aria-label="Back to home">‹</button>
+    <h1>PHEV Calculator</h1>
+    <button class="header-btn" id="theme-btn-phev" title="Toggle theme" aria-label="Toggle dark/light theme">◑</button>
+  </header>
+
+  <div class="tool-content">
+
+    <!-- ── Result hero ── -->
+    <div class="result-hero">
+      <div class="breakeven-label">Break-even electricity price</div>
+      <div class="breakeven-row">
+        <span class="breakeven-value" id="breakeven-value">—</span>
+        <span class="breakeven-unit">kr/kWh</span>
+      </div>
+      <div id="elec-status" class="status-badge positive">Calculating…</div>
+    </div>
+
+    <!-- ── Cost per 100 km comparison ── -->
+    <div class="card">
+      <div class="card-label">Cost per 100 km</div>
+      <div class="cost-row">
+        <div class="cost-mode">⛽ Fuel</div>
+        <div class="cost-bar-track"><div class="cost-bar fuel" id="fuel-bar" style="width:75%"></div></div>
+        <div class="cost-amount"><span id="fuel-cost-value">—</span> kr</div>
+      </div>
+      <div class="cost-row">
+        <div class="cost-mode">⚡ Elec</div>
+        <div class="cost-bar-track"><div class="cost-bar elec" id="elec-bar" style="width:28%"></div></div>
+        <div class="cost-amount"><span id="elec-cost-value">—</span> kr</div>
+      </div>
+    </div>
+
+    <!-- ── Monthly estimate ── -->
+    <div class="card">
+      <div class="card-label">Monthly estimate</div>
+      <div class="input-row">
+        <div class="input-label">Monthly driving</div>
+        <div class="input-wrap">
+          <input type="number" id="monthly-km-input" min="100" max="6000" step="50" value="1200" aria-label="Monthly km">
+          <span class="input-unit">km / mo</span>
+        </div>
+      </div>
+      <div class="range-row">
+        <span class="range-key">⚡ Electric</span>
+        <input type="range" id="elec-pct-input" min="0" max="100" step="5" value="70" aria-label="Percent electric driving">
+        <span class="range-val" id="elec-pct-display">70%</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <div style="text-align:center">
+        <div class="savings-big" id="monthly-savings">—</div>
+        <div class="savings-label">SEK saved vs all-fuel · per month</div>
+      </div>
+
+      <div class="month-costs">
+        <div class="month-cost-item">
+          <div class="month-cost-value" id="monthly-actual">—</div>
+          <div class="month-cost-label">Actual cost</div>
+        </div>
+        <div class="month-cost-item">
+          <div class="month-cost-value" id="monthly-all-fuel">—</div>
+          <div class="month-cost-label">If all-fuel</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Fuel price ── -->
+    <div class="card">
+      <div class="card-label">⛽ Today's Fuel Price — 95 E10</div>
+      <div class="input-row" style="margin-bottom:var(--space-3)">
+        <div class="input-label">Price per litre</div>
+        <div class="input-wrap">
+          <input type="number" id="fuel-price-input" min="5" max="30" step="0.01" value="14.40" aria-label="Fuel price SEK per litre">
+          <span class="input-unit">SEK / l</span>
+        </div>
+      </div>
+      <button class="btn" id="fetch-fuel-btn">↻ Fetch Gothenburg price</button>
+      <div class="source-text source-manual" id="fuel-source">Enter manually or fetch live from bensinpriser.nu</div>
+    </div>
+
+    <!-- ── Electricity price ── -->
+    <div class="card">
+      <div class="card-label">⚡ Your Electricity Price</div>
+      <div class="input-row">
+        <div class="input-label">All-in price</div>
+        <div class="input-wrap">
+          <input type="number" id="elec-price-input" min="0.10" max="10" step="0.05" value="1.70" aria-label="Electricity price SEK per kWh">
+          <span class="input-unit">SEK / kWh</span>
+        </div>
+      </div>
+      <div class="preset-chips">
+        <button class="preset-chip" data-elec="1.70">Volvo 1.70</button>
+        <button class="preset-chip" data-elec="2.50">VCC 2.50</button>
+        <button class="preset-chip" data-elec="3.70">Public Cheap 3.70</button>
+        <button class="preset-chip" data-elec="5.00">Public Fast 5.00</button>
+      </div>
+      <p class="hint">Include spot price + grid fee (elnät) + energy tax + 25% VAT</p>
+    </div>
+
+    <!-- ── Car efficiency ── -->
+    <div class="card">
+      <div class="card-label">🚗 Efficiency — XC60 T6 Recharge</div>
+      <div class="input-row">
+        <div class="input-label">Electric consumption</div>
+        <div class="input-wrap">
+          <input type="number" id="elec-eff-input" min="10" max="40" step="0.5" value="15.7" aria-label="Electric consumption kWh per 100km">
+          <span class="input-unit">kWh/100km</span>
+        </div>
+      </div>
+      <div class="input-row">
+        <div class="input-label">Fuel consumption (CS mode)</div>
+        <div class="input-wrap">
+          <input type="number" id="fuel-eff-input" min="3" max="20" step="0.1" value="6.9" aria-label="Fuel consumption litres per 100km">
+          <span class="input-unit">l/100km</span>
+        </div>
+      </div>
+      <p id="eff-note" class="eff-note" hidden></p>
+
+      <div class="import-area" id="import-area" role="button" aria-label="Import Volvo trip log CSV">
+        <input type="file" id="csv-file-input" accept=".csv" style="display:none" aria-hidden="true">
+        <div class="import-text">
+          <strong>📁 Import Volvo trip log</strong><br>
+          Drag & drop or click · Volvo Cars app CSV export
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CSV stats (hidden until imported) ── -->
+    <div class="card" id="csv-stats" hidden>
+      <div class="card-label">📊 Trip Log Analysis</div>
+      <div id="csv-date-range" style="font-size:11px;color:var(--text-dim);margin-bottom:var(--space-3)">—</div>
+      <div class="stat-grid">
+        <div>
+          <div class="stat-value" id="csv-trips">—</div>
+          <div class="stat-key">Trips analyzed</div>
+        </div>
+        <div>
+          <div class="stat-value" id="csv-total-km">—</div>
+          <div class="stat-key">Total km</div>
+        </div>
+        <div>
+          <div class="stat-value positive" id="csv-elec-pct">—</div>
+          <div class="stat-key">Electric share</div>
+        </div>
+        <div>
+          <div class="stat-value" id="csv-monthly-km">—</div>
+          <div class="stat-key">Avg monthly km</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tool-content -->
+</div><!-- /view-phev -->
+
+<script type="module" src="js/app.js"></script>
+<script type="module" src="js/phev.js"></script>
+</body>
+</html>
