@@ -3,8 +3,8 @@
  * Strategy: cache-first for app shell, network-first for external APIs
  */
 
-const CACHE = 'mytools-v5';
-const SHELL  = ['./', './js/app.js', './js/phev.js', './js/csv-parser.js', './manifest.json', './icon.svg'];
+const CACHE = 'mytools-v6';
+const SHELL  = ['./', './js/app.js', './js/phev.js', './js/csv-parser.js', './manifest.json', './icon.svg', './data/fuel-price.json'];
 const SKIP_CACHE = ['allorigins.win', 'bensinpriser.nu'];
 
 self.addEventListener('install', e => {

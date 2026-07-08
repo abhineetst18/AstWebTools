@@ -1,0 +1,74 @@
+name: Update Göteborg Fuel Price
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # 08:00 Stockholm time (UTC+2 summer)
+  workflow_dispatch:        # manual trigger from GitHub Actions UI
+
+jobs:
+  update-fuel-price:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch Göteborg 95 E10 prices from bensinpriser.nu
+        run: |
+          python3 << 'PYEOF'
+          import urllib.request, json, statistics
+          from datetime import datetime, timezone
+
+          req = urllib.request.Request(
+              'https://bensinpriser.nu/karta/data',
+              headers={
+                  'User-Agent': 'Mozilla/5.0 (compatible; GitHub Actions fuel-price-bot)',
+                  'Accept': 'application/json, */*',
+                  'X-Requested-With': 'XMLHttpRequest',
+                  'Referer': 'https://bensinpriser.nu/karta',
+              }
+          )
+
+          with urllib.request.urlopen(req, timeout=30) as r:
+              all_stations = json.loads(r.read())
+
+          gbg = [
+              s for s in all_stations
+              if s.get('communeLink') == 'goteborg' and s.get('price95')
+          ]
+          prices = sorted(s['price95'] for s in gbg)
+
+          if not prices:
+              raise ValueError('No Göteborg price95 data found')
+
+          result = {
+              'median':        float(statistics.median(prices)),
+              'cheapest':      prices[0],
+              'mostExpensive': prices[-1],
+              'average':       round(sum(prices) / len(prices), 2),
+              'stationCount':  len(prices),
+              'updatedAt':     datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+              'source':        'bensinpriser.nu',
+              'commune':       'goteborg',
+          }
+
+          with open('data/fuel-price.json', 'w') as f:
+              json.dump(result, f, indent=2)
+              f.write('\n')
+
+          print(f"OK: {len(prices)} stations · median {result['median']} · "
+                f"cheapest {result['cheapest']} · updated {result['updatedAt']}")
+          PYEOF
+
+      - name: Commit updated fuel price
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/fuel-price.json
+          if git diff --cached --quiet; then
+            echo "No price change — skipping commit"
+          else
+            git commit -m "data: update Göteborg 95 E10 price ($(date -u +%Y-%m-%d))"
+            git push
+          fi

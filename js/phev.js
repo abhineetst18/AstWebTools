@@ -5,14 +5,10 @@
 
 import { parseVolvoCsv } from './csv-parser.js';
 
-const STATE_KEY     = 'mytools_phev_v3';  // bumped: corrected fuel default to GBG average
-const FUEL_CACHE_KEY = 'mytools_fuel_cache_v2'; // bumped: clears stale 14.39 cache
-// Two CORS proxies tried in sequence — first success wins
-const PROXIES = [
-  url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-  url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-];
-const BENSIN_URL    = 'https://bensinpriser.nu/stationer/95/vastra-gotalands-lan/goteborg';
+const STATE_KEY      = 'mytools_phev_v3';
+const FUEL_CACHE_KEY = 'mytools_fuel_cache_v2';
+// Same-origin data file — updated daily by GitHub Actions (no CORS issues)
+const FUEL_PRICE_URL = './data/fuel-price.json';
 
 // XC60 T6 Recharge — conservative real-world defaults (not WLTP)
 const DEFAULTS = {
@@ -153,7 +149,7 @@ function bindUI() {
     });
   });
 
-  $('fetch-fuel-btn')?.addEventListener('click', fetchLiveFuelPrice);
+  $('fetch-fuel-btn')?.addEventListener('click', loadFuelPriceFile);
 
   setupImportArea();
 }
@@ -168,76 +164,42 @@ function restoreInputs() {
   setText('elec-pct-display', S.elecPct + '%');
 }
 
-// ── Fuel price fetch ─────────────────────────────────────
-async function fetchLiveFuelPrice() {
-  const btn = $('fetch-fuel-btn');
+// ── Fuel price — from same-origin data file (updated daily by GitHub Actions) ─
+/**
+ * Loads ./data/fuel-price.json written by the update-fuel-price.yml workflow.
+ * No CORS proxy needed — same origin as the GitHub Pages site.
+ * Falls back silently if the file is missing (e.g. local dev).
+ */
+async function loadFuelPriceFile() {
   const src = $('fuel-source');
-  if (!btn) return;
+  try {
+    const res = await fetch('./data/fuel-price.json', { cache: 'no-cache' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
 
-  btn.disabled = true;
-  btn.textContent = '⏳ Fetching…';
+    const price = data.median ?? data.average ?? data.cheapest;
+    if (!price || price < 5 || price > 30) throw new Error('Invalid price data');
 
-  let lastErr = null;
+    S.fuelPrice = price;
+    setVal('fuel-price-input', price);
+    saveState();
+    calculate();
 
-  for (const buildUrl of PROXIES) {
-    try {
-      const controller = new AbortController();
-      const tid = setTimeout(() => controller.abort(), 8000);
-
-      // corsproxy.io returns raw HTML; allorigins returns {contents:"..."}  
-      const proxyUrl = buildUrl(BENSIN_URL);
-      const res = await fetch(proxyUrl, { signal: controller.signal });
-      clearTimeout(tid);
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      let html;
-      const ct = res.headers.get('content-type') ?? '';
-      if (ct.includes('application/json')) {
-        const data = await res.json();
-        html = data.contents ?? data.response ?? '';
-      } else {
-        html = await res.text();
-      }
-
-      // Prices appear as e.g. "14,39kr" — grab the first (lowest in list)
-      const m = html.match(/(\d{2}),(\d{2})\s*kr/);
-      if (!m) throw new Error('No price pattern found in page');
-
-      const price = parseFloat(`${m[1]}.${m[2]}`);
-      if (price < 5 || price > 30) throw new Error(`Unexpected price: ${price}`);
-
-      S.fuelPrice = price;
-      setVal('fuel-price-input', price);
-
-      localStorage.setItem(FUEL_CACHE_KEY, JSON.stringify({
-        price, ts: Date.now(), source: 'bensinpriser.nu'
-      }));
-
-      if (src) {
-        src.textContent = `⚡ Live · bensinpriser.nu Göteborg (cheapest) · just now`;
-        src.className = 'source-text source-live';
-      }
-
-      saveState();
-      calculate();
-      return; // success — stop trying proxies
-
-    } catch (err) {
-      lastErr = err;
-      // try next proxy
+    if (src) {
+      const updated  = data.updatedAt ? new Date(data.updatedAt) : null;
+      const dateStr  = updated
+        ? updated.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })
+        : '?';
+      src.textContent = `bensinpriser.nu GBG · ${data.stationCount ?? '?'} stationer · median · upd ${dateStr}`;
+      src.className   = 'source-text source-live';
+    }
+  } catch (_) {
+    // Silently fail on local dev (file doesn't exist); default value stays
+    if (src && src.className !== 'source-text source-cached') {
+      src.textContent = 'Default: GBG avg · enter your actual price manually';
+      src.className   = 'source-text source-manual';
     }
   }
-
-  // All proxies failed
-  if (src) {
-    const msg = lastErr?.name === 'AbortError' ? 'Request timed out' : (lastErr?.message ?? 'Unknown error');
-    src.textContent = `Fetch failed — ${msg}. Enter price manually above.`;
-    src.className = 'source-text source-error';
-  }
-
-  btn.disabled = false;
-  btn.textContent = '↻ Fetch cheapest GBG price';
 }
 
 function tryLoadFuelCache() {
@@ -383,7 +345,9 @@ function init() {
   bindUI();
   restoreInputs();
   tryLoadFuelCache();
+  loadFuelPriceFile(); // auto-load same-origin JSON, no proxy needed
   calculate();
+  setupImportArea();
 }
 
 document.addEventListener('DOMContentLoaded', init);
