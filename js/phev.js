@@ -5,14 +5,14 @@
 
 import { parseVolvoCsv } from './csv-parser.js';
 
-const STATE_KEY     = 'mytools_phev_v2';  // bumped: new real-world efficiency defaults
+const STATE_KEY     = 'mytools_phev_v3';  // bumped: corrected fuel default to GBG average
 const FUEL_CACHE_KEY = 'mytools_fuel_cache_v1';
 const PROXY_URL     = 'https://api.allorigins.win/get?url=';
 const BENSIN_URL    = 'https://bensinpriser.nu/stationer/95/vastra-gotalands-lan/goteborg';
 
 // XC60 T6 Recharge — conservative real-world defaults (not WLTP)
 const DEFAULTS = {
-  fuelPrice:  14.40,  // SEK/l
+  fuelPrice:  16.05,  // SEK/l — Göteborg average Jul 2026 (not cheapest station)
   fuelEff:     6.94,  // l/100km — real-world average from trip logs
   elecEff:    15.69,  // kWh/100km — real-world average from trip logs
   elecPrice:   1.70,  // SEK/kWh — Volvo home charger plan

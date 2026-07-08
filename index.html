@@ -508,12 +508,12 @@
       <div class="input-row" style="margin-bottom:var(--space-3)">
         <div class="input-label">Price per litre</div>
         <div class="input-wrap">
-          <input type="number" id="fuel-price-input" min="5" max="30" step="0.01" value="14.40" aria-label="Fuel price SEK per litre">
+          <input type="number" id="fuel-price-input" min="5" max="30" step="0.01" value="16.05" aria-label="Fuel price SEK per litre">
           <span class="input-unit">SEK / l</span>
         </div>
       </div>
-      <button class="btn" id="fetch-fuel-btn">↻ Fetch Gothenburg price</button>
-      <div class="source-text source-manual" id="fuel-source">Enter manually or fetch live from bensinpriser.nu</div>
+      <button class="btn" id="fetch-fuel-btn">↻ Fetch cheapest GBG price</button>
+      <div class="source-text source-manual" id="fuel-source">Default: Göteborg avg July 2026 · fetch for cheapest live station price</div>
     </div>
 
     <!-- ── Electricity price ── -->
@@ -553,6 +553,9 @@
         </div>
       </div>
       <p id="eff-note" class="eff-note" hidden></p>
+      <p class="hint">Fuel data from logs reflects mixed driving modes (charge/hold/use battery).
+      On trips where the engine was charging the battery, logged l/100km is slightly
+      higher than pure driving — so the real fuel saving may be marginally better than shown.</p>
 
       <div class="import-area" id="import-area" role="button" aria-label="Import Volvo trip log CSV">
         <input type="file" id="csv-file-input" accept=".csv" style="display:none" aria-hidden="true">

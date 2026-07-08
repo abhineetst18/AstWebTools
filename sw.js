@@ -3,7 +3,7 @@
  * Strategy: cache-first for app shell, network-first for external APIs
  */
 
-const CACHE = 'mytools-v3';
+const CACHE = 'mytools-v4';
 const SHELL  = ['./', './js/app.js', './js/phev.js', './js/csv-parser.js', './manifest.json', './icon.svg'];
 const SKIP_CACHE = ['allorigins.win', 'bensinpriser.nu'];
 
