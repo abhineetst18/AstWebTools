@@ -6,8 +6,12 @@
 import { parseVolvoCsv } from './csv-parser.js';
 
 const STATE_KEY     = 'mytools_phev_v3';  // bumped: corrected fuel default to GBG average
-const FUEL_CACHE_KEY = 'mytools_fuel_cache_v1';
-const PROXY_URL     = 'https://api.allorigins.win/get?url=';
+const FUEL_CACHE_KEY = 'mytools_fuel_cache_v2'; // bumped: clears stale 14.39 cache
+// Two CORS proxies tried in sequence — first success wins
+const PROXIES = [
+  url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+  url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+];
 const BENSIN_URL    = 'https://bensinpriser.nu/stationer/95/vastra-gotalands-lan/goteborg';
 
 // XC60 T6 Recharge — conservative real-world defaults (not WLTP)
@@ -173,52 +177,67 @@ async function fetchLiveFuelPrice() {
   btn.disabled = true;
   btn.textContent = '⏳ Fetching…';
 
-  try {
-    const controller = new AbortController();
-    const tid = setTimeout(() => controller.abort(), 10000);
+  let lastErr = null;
 
-    const res = await fetch(
-      `${PROXY_URL}${encodeURIComponent(BENSIN_URL)}`,
-      { signal: controller.signal }
-    );
-    clearTimeout(tid);
+  for (const buildUrl of PROXIES) {
+    try {
+      const controller = new AbortController();
+      const tid = setTimeout(() => controller.abort(), 8000);
 
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    const html = data.contents ?? '';
+      // corsproxy.io returns raw HTML; allorigins returns {contents:"..."}  
+      const proxyUrl = buildUrl(BENSIN_URL);
+      const res = await fetch(proxyUrl, { signal: controller.signal });
+      clearTimeout(tid);
 
-    // Prices appear as e.g. "14,39kr" or "14,39 kr" — grab the first (cheapest)
-    const m = html.match(/(\d{2}),(\d{2})\s*kr/);
-    if (!m) throw new Error('No price pattern found in page');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-    const price = parseFloat(`${m[1]}.${m[2]}`);
-    if (price < 5 || price > 30) throw new Error(`Unexpected price: ${price}`);
+      let html;
+      const ct = res.headers.get('content-type') ?? '';
+      if (ct.includes('application/json')) {
+        const data = await res.json();
+        html = data.contents ?? data.response ?? '';
+      } else {
+        html = await res.text();
+      }
 
-    S.fuelPrice = price;
-    setVal('fuel-price-input', price);
+      // Prices appear as e.g. "14,39kr" — grab the first (lowest in list)
+      const m = html.match(/(\d{2}),(\d{2})\s*kr/);
+      if (!m) throw new Error('No price pattern found in page');
 
-    localStorage.setItem(FUEL_CACHE_KEY, JSON.stringify({
-      price, ts: Date.now(), source: 'bensinpriser.nu'
-    }));
+      const price = parseFloat(`${m[1]}.${m[2]}`);
+      if (price < 5 || price > 30) throw new Error(`Unexpected price: ${price}`);
 
-    if (src) {
-      src.textContent = `⚡ Live · bensinpriser.nu Göteborg · just now`;
-      src.className = 'source-text source-live';
+      S.fuelPrice = price;
+      setVal('fuel-price-input', price);
+
+      localStorage.setItem(FUEL_CACHE_KEY, JSON.stringify({
+        price, ts: Date.now(), source: 'bensinpriser.nu'
+      }));
+
+      if (src) {
+        src.textContent = `⚡ Live · bensinpriser.nu Göteborg (cheapest) · just now`;
+        src.className = 'source-text source-live';
+      }
+
+      saveState();
+      calculate();
+      return; // success — stop trying proxies
+
+    } catch (err) {
+      lastErr = err;
+      // try next proxy
     }
-
-    saveState();
-    calculate();
-
-  } catch (err) {
-    if (src) {
-      const msg = err.name === 'AbortError' ? 'Timed out' : err.message;
-      src.textContent = `Fetch failed (${msg}) — enter price manually`;
-      src.className = 'source-text source-error';
-    }
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '↻ Fetch Gothenburg price';
   }
+
+  // All proxies failed
+  if (src) {
+    const msg = lastErr?.name === 'AbortError' ? 'Request timed out' : (lastErr?.message ?? 'Unknown error');
+    src.textContent = `Fetch failed — ${msg}. Enter price manually above.`;
+    src.className = 'source-text source-error';
+  }
+
+  btn.disabled = false;
+  btn.textContent = '↻ Fetch cheapest GBG price';
 }
 
 function tryLoadFuelCache() {
