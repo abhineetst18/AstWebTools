@@ -173,7 +173,8 @@ function restoreInputs() {
 async function loadFuelPriceFile() {
   const src = $('fuel-source');
   try {
-    const res = await fetch('./data/fuel-price.json', { cache: 'no-cache' });
+    // Timestamp param forces a unique URL each call — bypasses any SW or browser cache
+    const res = await fetch(`./data/fuel-price.json?t=${Date.now()}`, { cache: 'no-cache' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
