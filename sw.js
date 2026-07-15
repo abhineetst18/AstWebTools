@@ -1,11 +1,13 @@
 /**
  * sw.js — Service Worker for My Tools PWA
- * Strategy: cache-first for app shell, network-first for external APIs
+ * App shell: cache-first (stable JS/HTML)
+ * Data files (/data/*): network-first — must always be fresh (updated daily by GH Actions)
  */
 
-const CACHE = 'mytools-v6';
-const SHELL  = ['./', './js/app.js', './js/phev.js', './js/csv-parser.js', './manifest.json', './icon.svg', './data/fuel-price.json'];
-const SKIP_CACHE = ['allorigins.win', 'bensinpriser.nu'];
+const CACHE = 'mytools-v7';
+const SHELL = ['./', './js/app.js', './js/phev.js', './js/csv-parser.js', './manifest.json', './icon.svg'];
+// data/ files must never be served stale — fetched network-first
+const NETWORK_FIRST = ['/data/'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -24,21 +26,34 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Pass through external/API requests uncached
-  if (SKIP_CACHE.some(h => e.request.url.includes(h))) return;
-  // Only handle GET requests within origin
   if (e.request.method !== 'GET') return;
 
+  const url = new URL(e.request.url);
+
+  // Network-first for data files (fuel price, etc.)
+  if (NETWORK_FIRST.some(p => url.pathname.includes(p))) {
+    e.respondWith(
+      fetch(e.request)
+        .then(res => {
+          if (res.ok) {
+            caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+          }
+          return res;
+        })
+        .catch(() => caches.match(e.request)) // offline fallback
+    );
+    return;
+  }
+
+  // Cache-first for app shell (JS, HTML, icons)
   e.respondWith(
     caches.match(e.request).then(cached => {
-      // Serve from cache, update in background (stale-while-revalidate)
       const network = fetch(e.request).then(res => {
         if (res.ok) {
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
+          caches.open(CACHE).then(c => c.put(e.request, res.clone()));
         }
         return res;
-      }).catch(() => cached); // fallback to cache on network failure
+      }).catch(() => cached);
       return cached ?? network;
     })
   );
