@@ -3,7 +3,7 @@
  * Hash-based navigation: #phev, #home (default)
  */
 
-const VIEWS = ['home', 'phev'];
+const VIEWS = ['home', 'phev', 'banana-cake'];
 let themeKey = 'mytools_theme';
 
 // ── Theme ────────────────────────────────────────────────
@@ -49,7 +49,7 @@ function init() {
   applyTheme(savedTheme);
 
   // Theme toggle buttons
-  document.querySelectorAll('#theme-btn, #theme-btn-phev').forEach(btn => {
+  document.querySelectorAll('#theme-btn, #theme-btn-phev, #theme-btn-banana-cake').forEach(btn => {
     btn.addEventListener('click', toggleTheme);
   });
 

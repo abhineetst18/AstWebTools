@@ -36,6 +36,7 @@
 
       --border:           rgba(255,255,255,0.08);
       --border-strong:    rgba(255,255,255,0.15);
+      --focus-ring:       var(--accent);
       --radius:           14px;
       --radius-sm:        8px;
       --radius-pill:      100px;
@@ -59,6 +60,7 @@
 
     /* ── Reset ── */
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
     /* ── Base ── */
     body {
@@ -402,6 +404,21 @@
 
     /* ── Efficiency note (shown after CSV import) ── */
     .eff-note { font-size: 11px; color: var(--electric); margin-top: var(--space-2); }
+
+    /* ── Banana cake ── */
+    .banana-options { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+    .banana-options .preset-chip.active { background: var(--accent-subtle); border-color: var(--accent); color: var(--text); }
+    .banana-warning { padding: var(--space-3); border: 1px solid var(--negative); border-radius: var(--radius-sm); background: var(--negative-bg); color: var(--text); font-size: 12px; line-height: 1.5; }
+    .banana-stat { color: var(--accent); font-size: 14px; font-weight: 600; }
+    .recipe-steps { padding-left: var(--space-5); display: flex; flex-direction: column; gap: var(--space-2); font-size: 13px; }
+    .recipe-steps li { padding-left: var(--space-1); }
+    .ingredient-group { margin-bottom: var(--space-3); font-size: 13px; }
+    .ingredient-group:last-child { margin-bottom: 0; }
+    .ingredient-group strong { color: var(--text-dim); font-size: 11px; text-transform: uppercase; }
+    .ingredient-group ul { list-style: none; margin-top: var(--space-1); }
+    .ingredient-group li::before { content: '•'; color: var(--accent); margin-right: var(--space-2); }
+    .banana-copy-row { display: flex; align-items: center; gap: var(--space-3); }
+    .banana-copy-status { color: var(--positive); font-size: 12px; min-height: 16px; }
   </style>
 </head>
 <body>
@@ -426,7 +443,11 @@
       <span class="tool-name">PHEV Calculator</span>
       <span class="tool-desc">Fuel vs electric cost — Volvo XC60 T6</span>
     </button>
-    <!-- Future tools appear here -->
+    <button class="tool-card" data-view="banana-cake">
+      <span class="tool-icon">🍌</span>
+      <span class="tool-name">Banana Cake</span>
+      <span class="tool-desc">Generate a batch-sized recipe</span>
+    </button>
   </div>
 </div>
 
@@ -593,7 +614,64 @@
   </div><!-- /tool-content -->
 </div><!-- /view-phev -->
 
+<div id="view-banana-cake" class="view">
+  <header class="app-header">
+    <button class="header-btn back-btn" data-view="home" aria-label="Back to home">‹</button>
+    <h1>Banana Cake</h1>
+    <button class="header-btn" id="theme-btn-banana-cake" title="Toggle theme" aria-label="Toggle dark/light theme">◑</button>
+  </header>
+
+  <div class="tool-content">
+    <div class="card">
+      <div class="card-label">Batch size</div>
+      <div class="input-row">
+        <label class="input-label" for="banana-weight-input">Banana weight, peeled</label>
+        <div class="input-wrap"><input type="number" id="banana-weight-input" min="100" max="900" step="1" value="320"><span class="input-unit">g</span></div>
+      </div>
+      <p class="hint">Soft bounds: values outside the tested 270–450 g range are extrapolated.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Pan</div>
+      <div class="banana-options" role="group" aria-label="Pan type">
+        <button class="preset-chip" id="pan-round-btn" aria-pressed="true">Round cake pan</button>
+        <button class="preset-chip" id="pan-loaf-btn" aria-pressed="false">Loaf pan</button>
+      </div>
+      <div class="banana-options" role="group" aria-label="Pan material">
+        <button class="preset-chip" id="pan-metal-btn" aria-pressed="true">Metal</button>
+        <button class="preset-chip" id="pan-glass-btn" aria-pressed="false">Glass</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Optional ingredients</div>
+      <div class="banana-options" role="group" aria-label="Optional ingredients">
+        <button class="preset-chip" id="blueberry-toggle" aria-pressed="false">Blueberries</button>
+        <button class="preset-chip" id="cinnamon-toggle" aria-pressed="true">Cinnamon</button>
+      </div>
+      <div class="input-row" id="blueberry-weight-row" hidden>
+        <label class="input-label" for="blueberry-weight-input">Blueberry weight</label>
+        <div class="input-wrap"><input type="number" id="blueberry-weight-input" min="0" max="500" step="1" value="110"><span class="input-unit">g</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Recipe view</div>
+      <div class="banana-options" role="group" aria-label="Recipe view mode">
+        <button class="preset-chip" id="view-combined-btn" aria-pressed="true">Ingredients + steps together</button>
+        <button class="preset-chip" id="view-separate-btn" aria-pressed="false">Ingredients separate from steps</button>
+      </div>
+    </div>
+
+    <div id="banana-warnings" class="banana-warning" role="alert" hidden></div>
+    <div class="card"><div class="card-label">Bake</div><div class="banana-stat" id="banana-stat">170°C · 35–45 min</div></div>
+    <div id="banana-recipe-output"></div>
+    <div class="banana-copy-row"><button class="btn" id="banana-copy-btn">Copy for WhatsApp</button><span id="banana-copy-status" aria-live="polite"></span></div>
+  </div>
+</div><!-- /view-banana-cake -->
+
 <script type="module" src="js/app.js"></script>
 <script type="module" src="js/phev.js"></script>
+<script type="module" src="js/banana-cake.js"></script>
 </body>
 </html>
