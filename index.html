@@ -407,6 +407,7 @@
 
     /* ── Banana cake ── */
     .banana-options { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+    .banana-options + .banana-options { margin-top: var(--space-3); }
     .banana-options .preset-chip.active { background: var(--accent-subtle); border-color: var(--accent); color: var(--text); }
     .banana-warning { padding: var(--space-3); border: 1px solid var(--negative); border-radius: var(--radius-sm); background: var(--negative-bg); color: var(--text); font-size: 12px; line-height: 1.5; }
     .banana-stat { color: var(--accent); font-size: 14px; font-weight: 600; }
@@ -444,7 +445,7 @@
       <span class="tool-desc">Fuel vs electric cost — Volvo XC60 T6</span>
     </button>
     <button class="tool-card" data-view="banana-cake">
-      <span class="tool-icon">🍌</span>
+      <span class="tool-icon">🎂</span>
       <span class="tool-name">Banana Cake</span>
       <span class="tool-desc">Generate a batch-sized recipe</span>
     </button>
