@@ -1,10 +1,10 @@
 {
-  "median": 16.71,
-  "cheapest": 16.67,
-  "mostExpensive": 16.77,
-  "average": 16.7,
-  "stationCount": 18,
-  "updatedAt": "2026-09-14T12:28:45Z",
+  "median": 18.29,
+  "cheapest": 16.77,
+  "mostExpensive": 18.65,
+  "average": 18.22,
+  "stationCount": 20,
+  "updatedAt": "2026-09-15T11:32:44Z",
   "source": "bensinpriser.nu",
   "commune": "goteborg"
 }
