@@ -1,15 +1,9 @@
 // Run: node --test tests/*.test.mjs
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ANCHORS, calculate, calibration, formatTsp, ingredients, steps } from '../js/banana-cake.js';
-import { REFERENCE_BAKES, addBake, adjustmentEvidence, allBakes, createBakeRecord, loadHistory, saveHistory } from '../js/bake-history.js';
+import { ANCHORS, calculate, formatTsp, ingredients, steps } from '../js/banana-cake.js';
 
 const WET_200 = { banana: 200, bananaCondition: 'wet', panType: 'round', panMaterial: 'metal', blueberries: true, blueberryG: 55, cinnamon: false, viewMode: 'combined' };
-
-function memoryStorage() {
-  const data = new Map();
-  return { getItem: k => (data.has(k) ? data.get(k) : null), setItem: (k, v) => data.set(k, String(v)) };
-}
 
 test('acceptance: 200 g old/wet bananas + 50–60 g blueberries', async t => {
   const recipe = calculate(WET_200);
@@ -35,10 +29,9 @@ test('acceptance: 200 g old/wet bananas + 50–60 g blueberries', async t => {
     assert.ok(recipe.warnings.some(w => /Old \/ wet bananas/.test(w)));
   });
 
-  const calib = calibration(recipe, WET_200, REFERENCE_BAKES);
   for (const combined of [true, false]) {
     await t.test(`includes the mandatory consistency check (${combined ? 'combined' : 'separate'} view)`, () => {
-      const method = steps(recipe, WET_200, combined, calib);
+      const method = steps(recipe, WET_200, combined);
       const check = method.find(s => s.startsWith('CONSISTENCY CHECK (mandatory, before baking)'));
       assert.ok(check);
       assert.match(check, /thick and spreadable/);
@@ -49,31 +42,18 @@ test('acceptance: 200 g old/wet bananas + 50–60 g blueberries', async t => {
     });
   }
 
-  await t.test('allows ~30 g extra flour as evidence, without adding it', () => {
-    assert.equal(calib.reserveFlourG, 30);
-    assert.match(calib.evidenceText, /~30 g extra flour/);
-    assert.match(calib.evidenceText, /not a requirement/);
-    const list = ingredients(recipe, WET_200, calib);
+  await t.test('allows ~30 g extra flour as an observed example, without adding it', () => {
+    const wet = recipe.warnings.find(w => /Old \/ wet bananas/.test(w));
+    assert.match(wet, /\+30 g \(125 → 155 g flour\)/);
+    assert.match(wet, /one example, not a rule/);
+    const list = ingredients(recipe, WET_200);
     assert.ok(list.dry.some(i => i.startsWith('125 g flour')));
-    assert.ok(list.dry.some(i => /~30 g \(add only if needed\)/.test(i)));
-  });
-
-  await t.test('records calculated 125 g and final 155 g flour', () => {
-    const record = createBakeRecord({ banana: 200, condition: 'wet', blueberriesG: 55, calculatedFlourG: recipe.flourG, addedFlourG: 30, outcome: 'good' });
-    assert.equal(record.calculatedFlourG, 125);
-    assert.equal(record.addedFlourG, 30);
-    assert.equal(record.actualFlourG, 155);
-    const ref = REFERENCE_BAKES[0];
-    assert.deepEqual([ref.banana, ref.condition, ref.calculatedFlourG, ref.addedFlourG, ref.actualFlourG, ref.outcome], [200, 'wet', 125, 30, 155, 'good']);
+    assert.ok(list.dry.some(i => /extra flour at hand/.test(i)));
   });
 
   await t.test('does not treat 155 g as universal for 200 g batches', () => {
     for (const bananaCondition of ['normal', 'wet']) assert.equal(calculate({ ...WET_200, bananaCondition }).flourG, 125);
-    const normal = calibration(calculate({ ...WET_200, bananaCondition: 'normal' }), { bananaCondition: 'normal' }, REFERENCE_BAKES);
-    assert.equal(normal.reserveFlourG, null, 'wet-banana evidence does not apply to normal bananas');
-    const dryBake = createBakeRecord({ banana: 200, condition: 'wet', calculatedFlourG: 125, addedFlourG: 0, outcome: 'good' });
-    const evidence = adjustmentEvidence(allBakes([dryBake]), { banana: 200, condition: 'wet', calculatedFlourG: 125 });
-    assert.deepEqual([evidence.minExtraG, evidence.maxExtraG], [0, 30], 'new evidence widens the range instead of fixing 30 g');
+    assert.ok(!calculate({ ...WET_200, bananaCondition: 'normal' }).warnings.some(w => /155 g/.test(w)));
   });
 });
 
@@ -86,18 +66,4 @@ test('anchors and interpolation stay sane across the input range', () => {
   const small = calculate({ ...WET_200, banana: 100 });
   assert.equal(small.flourG, 63);
   assert.ok(small.belowRange && small.warnings[0].includes('200 g'));
-});
-
-test('bake history persists, validates and only uses successful bakes as evidence', () => {
-  const storage = memoryStorage();
-  const sunk = createBakeRecord({ banana: 200, condition: 'wet', calculatedFlourG: 125, addedFlourG: 60, outcome: 'sunk' });
-  saveHistory(storage, addBake([], sunk));
-  const loaded = loadHistory(storage);
-  assert.equal(loaded.length, 1);
-  assert.equal(loaded[0].actualFlourG, 185);
-  const evidence = adjustmentEvidence(allBakes(loaded), { banana: 200, condition: 'wet', calculatedFlourG: 125 });
-  assert.equal(evidence.maxExtraG, 30);
-  assert.throws(() => createBakeRecord({ banana: 200, condition: 'wet', calculatedFlourG: 125, addedFlourG: -5, outcome: 'good' }), /addedFlourG/);
-  storage.setItem('mytools_bananacake_history_v1', '[{"banana":"x"}]');
-  assert.deepEqual(loadHistory(storage), []);
 });

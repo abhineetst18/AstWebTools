@@ -1,7 +1,5 @@
 /** Banana cake formulation and live recipe generator. */
 
-import { OUTCOMES, addBake, adjustmentEvidence, allBakes, createBakeRecord, loadHistory, removeBake, saveHistory } from './bake-history.js';
-
 const STATE_KEY = 'mytools_bananacake_v1';
 const DEFAULTS = {
   banana: 320,
@@ -14,7 +12,7 @@ const DEFAULTS = {
   viewMode: 'combined',
 };
 
-// Calculated (pre-calibration) quantities of tested bakes. Actual flour used is in bake history.
+// Calculated (pre-calibration) quantities of tested bakes; the batter consistency check sets the final flour.
 const ANCHORS = [
   { banana: 200, flourG: 125, sugarG: 63, butterG: 38, oilMl: 12, yogurtG: 50, milkMl: 60,
     bakingPowderTsp: 0.625, bakingSodaTsp: 0.25, saltTsp: 0.25, cardamomTsp: 0.25,
@@ -32,11 +30,8 @@ const ANCHORS = [
 
 const MIN_TESTED = ANCHORS[0].banana;
 const MAX_TESTED = ANCHORS[ANCHORS.length - 1].banana;
-const LOG_DEFAULTS = { addedFlourG: 0, addedMilkMl: 0, outcome: 'good', notes: '' };
 
 let S = { ...DEFAULTS };
-let history = [];
-let log = { ...LOG_DEFAULTS };
 
 function $(id) { return document.getElementById(id); }
 
@@ -107,7 +102,7 @@ function calculate(options = S) {
     warnings.push(`Above 500 g in one pan is untested. Consider splitting across two pans instead — e.g. a round cake pan + a loaf pan — the way 720 g was successfully split as 450 g + 270 g. Suggested split: e.g. ${panA} g in the round pan + ${B - panA} g in the loaf pan.`);
   }
   if (options.panMaterial === 'glass') warnings.push('Glass conducts heat more slowly than metal. A wide glass dish caused a collapsed, wet-centered cake in testing at high banana weights. Prefer metal; if using glass, expect a longer bake and check the center closely.');
-  if (options.bananaCondition === 'wet') warnings.push('Old / wet bananas: they release free liquid after peeling and mashing, so the batter will likely need extra flour. The calculated flour is deliberately NOT increased — add flour only at the consistency check, in small steps, until the batter is right.');
+  if (options.bananaCondition === 'wet') warnings.push('Old / wet bananas: they release free liquid after peeling and mashing, so the batter will likely need extra flour. The calculated flour is deliberately NOT increased — add flour only at the consistency check, in small steps, until the batter is right. Observed once: a 200 g batch of old, wet bananas needed +30 g (125 → 155 g flour). That is one example, not a rule for every batch.');
   const moistureNote = `Banana moisture varies with ripeness, water content and how much liquid is released after mashing — two batches of exactly ${B} g can need different amounts of flour. The ${recipe.flourG} g flour is a conservative starting amount; the consistency check before baking decides the final amount.`;
 
   let temp = B <= 350 ? 170 : 175;
@@ -119,30 +114,14 @@ function calculate(options = S) {
   return { ...recipe, warnings, moistureNote, temp, time, panType: options.panType, panMaterial: options.panMaterial };
 }
 
-/** Consistency-check guidance, enriched with evidence from similar successful bakes (never auto-applied). */
-function calibration(recipe, options, bakes = []) {
-  const evidence = adjustmentEvidence(bakes, { banana: recipe.banana, condition: options.bananaCondition, calculatedFlourG: recipe.flourG });
-  const condition = options.bananaCondition === 'wet' ? 'old/wet' : 'normal';
-  let evidenceText = '';
-  if (evidence && evidence.maxExtraG > 0) {
-    const range = evidence.minExtraG === evidence.maxExtraG ? `~${evidence.maxExtraG} g` : `${evidence.minExtraG}–${evidence.maxExtraG} g`;
-    const examples = evidence.bakes.map(b => `${b.banana} g: ${b.calculatedFlourG} → ${b.actualFlourG} g flour`).join('; ');
-    evidenceText = ` Evidence from ${evidence.count} similar successful bake${evidence.count > 1 ? 's' : ''} with ${condition} bananas (${examples}) suggests ${range} extra flour for this batch — set that aside, but add only what the batter actually needs. This is an observation, not a requirement.`;
-  } else if (evidence) {
-    evidenceText = ` Similar successful bakes with ${condition} bananas needed no extra flour — still check.`;
-  }
-  return { evidence, reserveFlourG: evidence && evidence.maxExtraG > 0 ? evidence.maxExtraG : null, evidenceText };
-}
-
-function checkpointStep(calib) {
+function checkpointStep() {
   return 'CONSISTENCY CHECK (mandatory, before baking): target is thick and spreadable — it falls slowly from the spatula, holds its shape briefly when deposited, is not watery or runny like pancake batter, and is not so stiff it won\'t spread. '
     + 'Too runny → add 10 g flour, fold gently, reassess; repeat if needed, continuing in 5–10 g steps. '
     + 'Too thick → add milk 5–10 ml at a time and stop as soon as it spreads. '
-    + 'Reassess after every addition and avoid over-correcting in either direction. Note how much you added and log it below — the final batter matters more than the calculated flour.'
-    + calib.evidenceText;
+    + 'Reassess after every addition and avoid over-correcting in either direction. The final batter matters more than the calculated flour.';
 }
 
-function ingredients(recipe, options, calib = calibration(recipe, options)) {
+function ingredients(recipe, options) {
   const wet = [
     `${recipe.banana} g ripe peeled banana`, `${recipe.sugarG} g sugar`, `${formatTsp(recipe.vaniljsockerTsp)} tsp vaniljsocker`,
     `${recipe.butterG} g melted, cooled butter`, `${recipe.oilMl} ml neutral oil`, `${recipe.yogurtG} g plain yogurt`,
@@ -153,13 +132,13 @@ function ingredients(recipe, options, calib = calibration(recipe, options)) {
     `${formatTsp(recipe.saltTsp)} tsp salt`, `${formatTsp(recipe.cardamomTsp)} tsp ground cardamom`,
   ];
   if (options.cinnamon) dry.push(`${formatTsp(recipe.cinnamonTsp)} tsp cinnamon`);
-  dry.push(calib.reserveFlourG ? `Extra flour set aside for calibration: ~${calib.reserveFlourG} g (add only if needed)` : 'A little extra flour at hand for the consistency check (add only if needed)');
+  dry.push('A little extra flour at hand for the consistency check (add only if needed)');
   return { wet, dry, addIns: options.blueberries ? [`${options.blueberryG} g blueberries`] : [] };
 }
 
 function panName(options) { return `${options.panType === 'round' ? '30 cm round' : 'loaf'} ${options.panMaterial} pan`; }
 
-function steps(recipe, options, combined, calib = calibration(recipe, options)) {
+function steps(recipe, options, combined) {
   const p = panName(options);
   const cinnamon = options.cinnamon ? `, and ${formatTsp(recipe.cinnamonTsp)} tsp cinnamon` : '';
   const blueberryStep = options.blueberries
@@ -169,7 +148,7 @@ function steps(recipe, options, combined, calib = calibration(recipe, options)) 
     `Mash ${recipe.banana} g ripe peeled banana in a bowl.`, 'Add the sugar and vaniljsocker to the wet mixture. Mix ~1 min, then rest 2 min.',
     'Add the melted, cooled butter and neutral oil to the wet mixture.', 'Add the plain yogurt and milk to the wet mixture.', 'Add the lemon juice to the wet mixture. Mix until smooth.',
     'Add the dry mixture to the wet mixture. Mix until just combined.',
-    'Fold gently until just combined. Rest the batter 10 min, then give it 2–3 gentle folds.', checkpointStep(calib),
+    'Fold gently until just combined. Rest the batter 10 min, then give it 2–3 gentle folds.', checkpointStep(),
     ...(blueberryStep ? [blueberryStep] : []), `Pour into the pan.`, `Bake at ${recipe.temp}°C for ${recipe.time}.`,
     'Start checking at the low end of the range. Toothpick should show a few moist crumbs, never wet batter; center should spring back gently. (Optional: internal temperature 96–98°C on a food thermometer.)',
     'Cool 15 min in the pan, then move to a rack. Wait 45–60 min before cutting — the crumb keeps setting as it cools. Leave uncovered unless the top browns too fast, then add loose foil (foil does not fix an over-wet batter).',
@@ -179,21 +158,16 @@ function steps(recipe, options, combined, calib = calibration(recipe, options)) 
     `Mash ${recipe.banana} g ripe peeled banana in a bowl.`, `Add ${recipe.sugarG} g sugar and ${formatTsp(recipe.vaniljsockerTsp)} tsp vaniljsocker. Mix ~1 min, then rest 2 min.`,
     `Add ${recipe.butterG} g melted, cooled butter and ${recipe.oilMl} ml neutral oil.`, `Add ${recipe.yogurtG} g plain yogurt and ${recipe.milkMl} ml milk.`,
     `Add ${formatTsp(recipe.lemonJuiceTsp)} tsp lemon juice. Mix until smooth.`, `Add ${recipe.flourG} g flour (starting amount), ${formatTsp(recipe.bakingPowderTsp)} tsp baking powder, ${formatTsp(recipe.bakingSodaTsp)} tsp baking soda, ${formatTsp(recipe.saltTsp)} tsp salt, ${formatTsp(recipe.cardamomTsp)} tsp ground cardamom${cinnamon}.`,
-    'Fold gently until just combined. Rest the batter 10 min, then give it 2–3 gentle folds.', checkpointStep(calib),
+    'Fold gently until just combined. Rest the batter 10 min, then give it 2–3 gentle folds.', checkpointStep(),
     ...(blueberryStep ? [blueberryStep] : []), 'Pour into the pan.', `Bake at ${recipe.temp}°C for ${recipe.time}.`,
     'Start checking at the low end of the range. Toothpick should show a few moist crumbs, never wet batter; center should spring back gently. (Optional: internal temperature 96–98°C on a food thermometer.)',
     'Cool 15 min in the pan, then move to a rack. Wait 45–60 min before cutting — the crumb keeps setting as it cools. Leave uncovered unless the top browns too fast, then add loose foil (foil does not fix an over-wet batter).',
   ];
 }
 
-function escapeHtml(text) {
-  return String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
-}
-
 function currentPlan() {
   const recipe = calculate(S);
-  const calib = calibration(recipe, S, allBakes(history));
-  return { recipe, calib, list: ingredients(recipe, S, calib), method: steps(recipe, S, S.viewMode === 'combined', calib) };
+  return { recipe, list: ingredients(recipe, S), method: steps(recipe, S, S.viewMode === 'combined') };
 }
 
 function render() {
@@ -212,47 +186,6 @@ function render() {
     const groups = [['Wet', list.wet], ['Dry', list.dry], ['Add-ins', list.addIns]];
     output.innerHTML = `<div class="card"><div class="card-label">Ingredients</div>${groups.filter(([, values]) => values.length).map(([name, values]) => `<div class="ingredient-group"><strong>${name}</strong><ul>${values.map(item => `<li>${item}</li>`).join('')}</ul></div>`).join('')}</div>${methodCard}`;
   }
-  renderLog(recipe);
-  renderHistory();
-}
-
-function renderLog(recipe) {
-  $('log-calculated-flour').textContent = `${recipe.flourG} g`;
-  $('log-actual-flour').textContent = `${recipe.flourG + log.addedFlourG} g`;
-  Object.keys(OUTCOMES).forEach(key => setPressed(`log-outcome-${key}`, log.outcome === key));
-}
-
-function renderHistory() {
-  const bakes = allBakes(history).slice().reverse();
-  $('bake-history-list').innerHTML = bakes.map(b => {
-    const milk = b.addedMilkMl ? ` · +${b.addedMilkMl} ml milk` : '';
-    const berries = b.blueberriesG ? ` · ${b.blueberriesG} g blueberries` : '';
-    const remove = b.reference ? '<span class="history-tag">reference</span>' : `<button class="btn history-delete" data-id="${escapeHtml(b.id)}" aria-label="Delete bake from ${escapeHtml(b.date)}">Delete</button>`;
-    return `<li class="history-item"><div class="history-head"><strong>${escapeHtml(b.date)} · ${b.banana} g · ${b.condition === 'wet' ? 'old/wet' : 'normal'} bananas</strong>${remove}</div>`
-      + `<div>Flour: ${b.calculatedFlourG} g calculated → <strong>${b.actualFlourG} g actual</strong> (+${b.addedFlourG} g)${milk}${berries}</div>`
-      + `<div class="history-outcome">${escapeHtml(OUTCOMES[b.outcome])}${b.notes ? ` — ${escapeHtml(b.notes)}` : ''}</div></li>`;
-  }).join('');
-}
-
-function saveBake() {
-  const { recipe } = currentPlan();
-  const status = $('log-status');
-  try {
-    const record = createBakeRecord({
-      banana: recipe.banana, condition: S.bananaCondition, blueberriesG: S.blueberries ? S.blueberryG : 0,
-      calculatedFlourG: recipe.flourG, addedFlourG: log.addedFlourG, addedMilkMl: log.addedMilkMl,
-      outcome: log.outcome, notes: log.notes,
-    });
-    history = addBake(history, record);
-    saveHistory(localStorage, history);
-    log = { ...LOG_DEFAULTS };
-    restoreLogInputs();
-    status.textContent = `Saved: ${record.calculatedFlourG} g → ${record.actualFlourG} g flour ✓`;
-  } catch (err) {
-    status.textContent = `Not saved: ${err.message}`;
-  }
-  render();
-  window.setTimeout(() => { status.textContent = ''; }, 3000);
 }
 
 function copyText() {
@@ -289,20 +222,9 @@ function bindUI() {
   ['combined', 'separate'].forEach(mode => $(mode === 'combined' ? 'view-combined-btn' : 'view-separate-btn').addEventListener('click', () => { S.viewMode = mode; saveState(); restoreInputs(); render(); }));
   bindNumber('blueberry-weight-input', value => { S.blueberryG = Math.min(500, Math.max(0, value)); saveState(); });
   bindToggle('blueberry-toggle', 'blueberries'); bindToggle('cinnamon-toggle', 'cinnamon'); $('banana-copy-btn').addEventListener('click', copyText);
-  bindNumber('log-added-flour', value => { log.addedFlourG = Math.min(500, Math.max(0, Math.round(value))); });
-  bindNumber('log-added-milk', value => { log.addedMilkMl = Math.min(500, Math.max(0, Math.round(value))); });
-  Object.keys(OUTCOMES).forEach(key => $(`log-outcome-${key}`).addEventListener('click', () => { log.outcome = key; render(); }));
-  $('log-notes').addEventListener('input', e => { log.notes = e.target.value; });
-  $('log-save-btn').addEventListener('click', saveBake);
-  $('bake-history-list').addEventListener('click', e => {
-    const button = e.target.closest('.history-delete');
-    if (!button || !window.confirm('Delete this bake from your history?')) return;
-    history = removeBake(history, button.dataset.id); saveHistory(localStorage, history); render();
-  });
 }
 
 function setPressed(id, pressed) { const button = $(id); button.setAttribute('aria-pressed', String(pressed)); button.classList.toggle('active', pressed); }
-function restoreLogInputs() { $('log-added-flour').value = log.addedFlourG; $('log-added-milk').value = log.addedMilkMl; $('log-notes').value = log.notes; }
 function restoreInputs() {
   $('banana-weight-input').value = S.banana; $('blueberry-weight-input').value = S.blueberryG; $('blueberry-weight-row').hidden = !S.blueberries;
   setPressed('banana-normal-btn', S.bananaCondition === 'normal'); setPressed('banana-wet-btn', S.bananaCondition === 'wet');
@@ -310,7 +232,7 @@ function restoreInputs() {
   setPressed('blueberry-toggle', S.blueberries); setPressed('cinnamon-toggle', S.cinnamon); setPressed('view-combined-btn', S.viewMode === 'combined'); setPressed('view-separate-btn', S.viewMode === 'separate');
 }
 
-function init() { loadState(); history = loadHistory(localStorage); bindUI(); restoreInputs(); restoreLogInputs(); render(); }
+function init() { loadState(); bindUI(); restoreInputs(); render(); }
 
-export { ANCHORS, calculate, calibration, formatTsp, ingredients, interpolate, steps };
+export { ANCHORS, calculate, checkpointStep, formatTsp, ingredients, interpolate, steps };
 if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded', init);

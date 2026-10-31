@@ -422,17 +422,6 @@
     .banana-copy-status { color: var(--positive); font-size: 12px; min-height: 16px; }
     .banana-condition { margin-top: var(--space-3); }
     .recipe-steps li.checkpoint-step { padding: var(--space-2); border: 1px solid var(--accent); border-radius: var(--radius-sm); background: var(--accent-subtle); }
-    .banana-notes-label { display: block; margin-top: var(--space-3); }
-    .banana-notes { width: 100%; margin-top: var(--space-1); padding: var(--space-2); background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 13px; outline: none; }
-    .banana-notes:focus { border-color: var(--border-strong); box-shadow: 0 0 0 2px var(--accent-subtle); }
-    .banana-log-actions { margin-top: var(--space-3); }
-    .bake-history { list-style: none; display: flex; flex-direction: column; gap: var(--space-3); font-size: 12px; line-height: 1.5; }
-    .history-item { padding-bottom: var(--space-3); border-bottom: 1px solid var(--border); }
-    .history-item:last-child { padding-bottom: 0; border-bottom: none; }
-    .history-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
-    .history-outcome { color: var(--text-dim); }
-    .history-tag { color: var(--text-dim); font-size: 11px; text-transform: uppercase; }
-    .history-delete { padding: var(--space-1) var(--space-2); font-size: 11px; }
   </style>
 </head>
 <body>
@@ -687,34 +676,6 @@
     <div id="banana-recipe-output"></div>
     <div class="banana-copy-row"><button class="btn" id="banana-copy-btn">Copy for WhatsApp</button><span id="banana-copy-status" aria-live="polite"></span></div>
 
-    <div class="card">
-      <div class="card-label">Log this bake</div>
-      <div class="input-row"><span class="input-label">Calculated flour</span><span class="banana-stat" id="log-calculated-flour">–</span></div>
-      <div class="input-row">
-        <label class="input-label" for="log-added-flour">Extra flour added at the check</label>
-        <div class="input-wrap"><input type="number" id="log-added-flour" min="0" max="500" step="5" value="0"><span class="input-unit">g</span></div>
-      </div>
-      <div class="input-row">
-        <label class="input-label" for="log-added-milk">Extra milk added at the check</label>
-        <div class="input-wrap"><input type="number" id="log-added-milk" min="0" max="500" step="5" value="0"><span class="input-unit">ml</span></div>
-      </div>
-      <div class="input-row"><span class="input-label">Actual flour used</span><span class="banana-stat" id="log-actual-flour">–</span></div>
-      <div class="banana-options" role="group" aria-label="Outcome">
-        <button class="preset-chip" id="log-outcome-good" aria-pressed="true">Turned out fine</button>
-        <button class="preset-chip" id="log-outcome-dense" aria-pressed="false">Too dense / dry</button>
-        <button class="preset-chip" id="log-outcome-wet" aria-pressed="false">Wet / gummy center</button>
-        <button class="preset-chip" id="log-outcome-sunk" aria-pressed="false">Sunk / collapsed</button>
-      </div>
-      <label class="input-label banana-notes-label" for="log-notes">Notes</label>
-      <input type="text" id="log-notes" class="banana-notes" maxlength="500" placeholder="e.g. bananas very soft, lots of liquid">
-      <div class="banana-copy-row banana-log-actions"><button class="btn" id="log-save-btn">Save to history</button><span id="log-status" class="banana-copy-status" aria-live="polite"></span></div>
-      <p class="hint">Saves banana weight, condition, blueberries and calculated vs. actual flour. Successful bakes become evidence for future checks — never an automatic flour increase.</p>
-    </div>
-
-    <div class="card">
-      <div class="card-label">Bake history</div>
-      <ul class="bake-history" id="bake-history-list"></ul>
-    </div>
   </div>
 </div><!-- /view-banana-cake -->
 
