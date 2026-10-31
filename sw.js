@@ -4,8 +4,8 @@
  * Data files (/data/*): network-first — must always be fresh (updated daily by GH Actions)
  */
 
-const CACHE = 'mytools-v8';
-const SHELL = ['./', './js/app.js', './js/phev.js', './js/banana-cake.js', './js/csv-parser.js', './manifest.json', './icon.svg'];
+const CACHE = 'mytools-v9';
+const SHELL = ['./', './js/app.js', './js/phev.js', './js/banana-cake.js', './js/bake-history.js', './js/csv-parser.js', './manifest.json', './icon.svg'];
 // data/ files must never be served stale — fetched network-first
 const NETWORK_FIRST = ['/data/'];
 
