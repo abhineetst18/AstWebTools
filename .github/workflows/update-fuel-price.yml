@@ -1,67 +1,49 @@
-name: Update Göteborg Fuel Price
+name: Publish AstWebTools
 
 on:
+  push:
+    branches: [main]
   schedule:
-    - cron: '0 6 * * *'   # 08:00 Stockholm time (UTC+2 summer)
-  workflow_dispatch:        # manual trigger from GitHub Actions UI
+    - cron: '0 6 * * *'   # 07:00 Stockholm in winter, 08:00 in summer
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
-  update-fuel-price:
+  prepare:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
+      pages: read
+    outputs:
+      snapshot-sha: ${{ steps.stage.outputs.snapshot-sha }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - uses: actions/configure-pages@v5
+
+      - name: Test fuel parser and app
+        run: |
+          python3 -B -m unittest discover -s tests -p 'test_*.py'
+          node --test tests/*.test.mjs
 
       - name: Fetch Göteborg 95 E10 prices from bensinpriser.nu
+        if: github.event_name != 'push'
         run: |
-          python3 << 'PYEOF'
-          import urllib.request, json, statistics
-          from datetime import datetime, timezone
-
-          req = urllib.request.Request(
-              'https://bensinpriser.nu/karta/data',
-              headers={
-                  'User-Agent': 'Mozilla/5.0 (compatible; GitHub Actions fuel-price-bot)',
-                  'Accept': 'application/json, */*',
-                  'X-Requested-With': 'XMLHttpRequest',
-                  'Referer': 'https://bensinpriser.nu/karta',
-              }
-          )
-
-          with urllib.request.urlopen(req, timeout=30) as r:
-              all_stations = json.loads(r.read())
-
-          gbg = [
-              s for s in all_stations
-              if s.get('communeLink') == 'goteborg' and s.get('price95')
-          ]
-          prices = sorted(s['price95'] for s in gbg)
-
-          if not prices:
-              raise ValueError('No Göteborg price95 data found')
-
-          result = {
-              'median':        float(statistics.median(prices)),
-              'cheapest':      prices[0],
-              'mostExpensive': prices[-1],
-              'average':       round(sum(prices) / len(prices), 2),
-              'stationCount':  len(prices),
-              'updatedAt':     datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
-              'source':        'bensinpriser.nu',
-              'commune':       'goteborg',
-          }
-
-          with open('data/fuel-price.json', 'w') as f:
-              json.dump(result, f, indent=2)
-              f.write('\n')
-
-          print(f"OK: {len(prices)} stations · median {result['median']} · "
-                f"cheapest {result['cheapest']} · updated {result['updatedAt']}")
-          PYEOF
+          curl --fail --silent --show-error --max-time 30 --retry 2 --retry-max-time 60 \
+            'https://bensinpriser.nu/stationer/95/vastra-gotalands-lan/goteborg' \
+            --output "$RUNNER_TEMP/goteborg-fuel-prices.html"
+          python3 scripts/update_fuel_price.py "$RUNNER_TEMP/goteborg-fuel-prices.html"
 
       - name: Commit updated fuel price
+        if: github.event_name != 'push'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -70,5 +52,52 @@ jobs:
             echo "No price change — skipping commit"
           else
             git commit -m "data: update Göteborg 95 E10 price ($(date -u +%Y-%m-%d))"
-            git push
+            git push origin HEAD:main
           fi
+
+      - name: Stage public assets
+        id: stage
+        run: |
+          site="$RUNNER_TEMP/site"
+          mkdir -p "$site/data"
+          cp index.html manifest.json sw.js icon.svg "$site/"
+          cp -r js "$site/"
+          cp data/fuel-price.json "$site/data/"
+          echo "snapshot-sha=$(sha256sum "$site/data/fuel-price.json" | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: ${{ runner.temp }}/site
+
+  deploy:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+
+      - name: Verify the public fuel snapshot
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          SNAPSHOT_SHA: ${{ needs.prepare.outputs.snapshot-sha }}
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if curl --fail --silent --show-error --max-time 15 \
+                "${PAGE_URL%/}/data/fuel-price.json?run=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${attempt}" \
+                --output "$RUNNER_TEMP/published-fuel.json" &&
+                echo "$SNAPSHOT_SHA  $RUNNER_TEMP/published-fuel.json" | sha256sum --check --status; then
+              echo "The public fuel snapshot matches the deployed artifact."
+              exit 0
+            fi
+            if [[ "$attempt" != 5 ]]; then sleep 10; fi
+          done
+          echo "::error::The public fuel snapshot does not match the deployed artifact."
+          exit 1

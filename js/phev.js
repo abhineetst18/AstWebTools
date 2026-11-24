@@ -6,9 +6,9 @@
 import { parseVolvoCsv } from './csv-parser.js';
 
 const STATE_KEY      = 'mytools_phev_v3';
-const FUEL_CACHE_KEY = 'mytools_fuel_cache_v2';
 // Same-origin data file — updated daily by GitHub Actions (no CORS issues)
 const FUEL_PRICE_URL = './data/fuel-price.json';
+const FUEL_MAX_AGE_MS = 48 * 60 * 60 * 1000;
 
 // XC60 T6 Recharge — conservative real-world defaults (not WLTP)
 const DEFAULTS = {
@@ -117,7 +117,16 @@ function bindUI() {
     if (!el) return;
     el.addEventListener('input', () => {
       const v = parser(el.value);
-      if (Number.isFinite(v)) { S[stateKey] = v; saveState(); calculate(); }
+      if (Number.isFinite(v)) {
+        S[stateKey] = v;
+        if (stateKey === 'fuelPrice') {
+          setText('fuel-source', 'Manual fuel price');
+          const src = $('fuel-source');
+          if (src) src.className = 'source-text source-manual';
+        }
+        saveState();
+        calculate();
+      }
     });
   }
 
@@ -168,18 +177,17 @@ function restoreInputs() {
 /**
  * Loads ./data/fuel-price.json written by the update-fuel-price.yml workflow.
  * No CORS proxy needed — same origin as the GitHub Pages site.
- * Falls back silently if the file is missing (e.g. local dev).
+ * Keeps the current calculator value when no usable snapshot is available.
  */
 async function loadFuelPriceFile() {
   const src = $('fuel-source');
   try {
-    // Timestamp param forces a unique URL each call — bypasses any SW or browser cache
-    const res = await fetch(`./data/fuel-price.json?t=${Date.now()}`, { cache: 'no-cache' });
+    const res = await fetch(FUEL_PRICE_URL, { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
     const price = data.median ?? data.average ?? data.cheapest;
-    if (!price || price < 5 || price > 30) throw new Error('Invalid price data');
+    if (!Number.isFinite(price) || price < 5 || price > 30) throw new Error('Invalid price data');
 
     S.fuelPrice = price;
     setVal('fuel-price-input', price);
@@ -187,40 +195,24 @@ async function loadFuelPriceFile() {
     calculate();
 
     if (src) {
-      const updated  = data.updatedAt ? new Date(data.updatedAt) : null;
-      const dateStr  = updated
-        ? updated.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })
-        : '?';
-      src.textContent = `bensinpriser.nu GBG · ${data.stationCount ?? '?'} stationer · median · upd ${dateStr}`;
-      src.className   = 'source-text source-live';
+      const timestamp = Date.parse(data.updatedAt);
+      const age = Date.now() - timestamp;
+      const stale = !(age >= 0 && age < FUEL_MAX_AGE_MS);
+      const cached = res.headers.get('X-Fuel-Cache') === 'hit';
+      const dateStr = Number.isFinite(timestamp)
+        ? new Date(timestamp).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })
+        : 'unknown';
+      const status = stale ? 'Stale · ' : cached ? 'Cached · ' : '';
+      src.textContent = `${status}bensinpriser.nu GBG · ${data.stationCount ?? '?'} stationer · upd ${dateStr}`;
+      src.className = `source-text ${stale || cached ? 'source-cached' : 'source-live'}`;
     }
-  } catch (_) {
-    // Silently fail on local dev (file doesn't exist); default value stays
-    if (src && src.className !== 'source-text source-cached') {
-      src.textContent = 'Default: GBG avg · enter your actual price manually';
+  } catch (error) {
+    console.warn('Could not load the fuel snapshot', error);
+    if (src) {
+      src.textContent = 'Fuel update unavailable · current price kept; enter your actual price manually';
       src.className   = 'source-text source-manual';
     }
   }
-}
-
-function tryLoadFuelCache() {
-  try {
-    const cache = JSON.parse(localStorage.getItem(FUEL_CACHE_KEY));
-    if (!cache?.price || !cache?.ts) return;
-
-    const ageMin = Math.round((Date.now() - cache.ts) / 60000);
-    if (ageMin > 180) return; // expire after 3 hours
-
-    S.fuelPrice = cache.price;
-    setVal('fuel-price-input', cache.price);
-
-    const src = $('fuel-source');
-    if (src) {
-      const ageStr = ageMin < 2 ? 'just now' : `${ageMin} min ago`;
-      src.textContent = `Cached · bensinpriser.nu Göteborg · ${ageStr}`;
-      src.className = 'source-text source-cached';
-    }
-  } catch (_) {}
 }
 
 // ── CSV Import ────────────────────────────────────────────
@@ -345,7 +337,6 @@ function init() {
   loadState();
   bindUI();
   restoreInputs();
-  tryLoadFuelCache();
   loadFuelPriceFile(); // auto-load same-origin JSON, no proxy needed
   calculate();
   setupImportArea();

@@ -10,7 +10,19 @@ Static PWA ("My Tools"), no build step. Served as-is; `sw.js` caches the app she
 | `js/app.js` | View routing (`VIEWS`), theme toggle | `index.html` |
 | `js/phev.js` | PHEV cost calculator | `index.html`; imports `csv-parser.js`; fetches `data/fuel-price.json` |
 | `js/csv-parser.js` | Volvo trip CSV parsing | `phev.js` |
-| `data/fuel-price.json` | Göteborg fuel price, updated daily by `.github/workflows/update-fuel-price.yml` | `phev.js` (network-first in `sw.js`) |
+| `data/fuel-price.json` | Göteborg 95 E10 snapshot; the daily `update-fuel-price.yml` workflow reads exact prices from the public Göteborg station listing via `scripts/update_fuel_price.py`. The map feed only exposes price tiers. | `phev.js` (network-first in `sw.js`) |
+
+### GitHub Pages
+
+Set **Settings > Pages > Source** to **GitHub Actions**. The **Publish AstWebTools**
+workflow deploys on pushes to `main`. Scheduled and manual runs on `main` also
+refresh `data/fuel-price.json` before uploading the public files. A separate
+deployment job publishes the artifact and checks that the public snapshot matches
+it. No personal access token is required. If branch rules reject the workflow's
+snapshot commit, review the run's push error before changing any branch rules.
+
+The calculator labels snapshots at least 48 hours old as stale. When the request
+fails, the service worker can reuse one previously downloaded snapshot.
 | `js/banana-cake.js` | Banana cake formulation, recipe text, consistency check | `index.html`, tests |
 | `sw.js` | Cache-first app shell (`SHELL`), network-first `/data/` | browser |
 | `tests/banana-cake.test.mjs` | `node --test tests/*.test.mjs` acceptance tests | — |
