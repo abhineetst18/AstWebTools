@@ -38,6 +38,8 @@ jobs:
         if: github.event_name != 'push'
         run: |
           curl --fail --silent --show-error --max-time 30 --retry 2 --retry-max-time 60 \
+            --user-agent 'Mozilla/5.0 (compatible; GitHub Actions fuel-price-bot)' \
+            --header 'Accept: text/html' \
             'https://bensinpriser.nu/stationer/95/vastra-gotalands-lan/goteborg' \
             --output "$RUNNER_TEMP/goteborg-fuel-prices.html"
           python3 scripts/update_fuel_price.py "$RUNNER_TEMP/goteborg-fuel-prices.html"
