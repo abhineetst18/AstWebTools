@@ -21,8 +21,12 @@ deployment job publishes the artifact and checks that the public snapshot matche
 it. No personal access token is required. If branch rules reject the workflow's
 snapshot commit, review the run's push error before changing any branch rules.
 
-The calculator labels snapshots at least 48 hours old as stale. When the request
-fails, the service worker can reuse one previously downloaded snapshot.
+The calculator labels snapshots at least 48 hours old as stale and does not
+apply them automatically. Manually entered prices survive reloads; use the fuel
+refresh button to replace one with the station snapshot. When the request fails,
+the service worker can reuse one previously downloaded snapshot.
+Trip-log imports prefill the electric-share slider; the calculator uses the
+slider value if the user later adjusts it.
 | `js/banana-cake.js` | Banana cake formulation, recipe text, consistency check | `index.html`, tests |
 | `sw.js` | Cache-first app shell (`SHELL`), network-first `/data/` | browser |
 | `tests/banana-cake.test.mjs` | `node --test tests/*.test.mjs` acceptance tests | — |
